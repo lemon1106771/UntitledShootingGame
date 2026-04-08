@@ -280,14 +280,15 @@ class Game:
                     stats["ammo"] -= 1
                     stats["cooldown"] = stats["fire_rate"]
                     
-                    # Play the specific rifle shoot sound
                     self.play_sound(self.weapon_sounds["rifle"]["shoot"]) 
-                    
                     new_bullet = Bullet(self.gun.rect.centerx, self.gun.rect.centery, self.gun.current_angle)
                     self.bullets.add(new_bullet)
                     
                     if stats["ammo"] <= 0:
                         self.start_reload()
+                else:
+                    # If they try to fire while empty, force the reload
+                    self.start_reload()
             # Update all sprites
             self.player.update(self.platforms) 
             self.gun.update()
@@ -385,7 +386,6 @@ class Game:
             
             self.screen.blit(self.font.render(f"Score: {self.score}", True, GOLD), (20, 20)) 
             self.screen.blit(self.font.render(f"Health: {self.player.health}", True, RED), (20, 70))
-            self.screen.blit(self.small_font.render("Press 'M' for Menu", True, (150, 150, 150)), (SCREEN_WIDTH - 220, 20))
 
             # Ammo Display
             stats = self.weapons_data[self.weapon]

@@ -84,7 +84,7 @@ class Player(pygame.sprite.Sprite):
                     self.vel_y = 0
 
     def draw(self, surface):
-        # If invincible, create a flashing effect using modulo math
+        # If invincible, create a flashing effect
         if self.invincible:
             # Only draw the player half the time (flashes every 10 frames)
             if self.invincibility_timer % 10 < 5:

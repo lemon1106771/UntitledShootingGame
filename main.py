@@ -325,9 +325,9 @@ class Game:
             if killed:
                 self.play_sound(self.enemy_hit_sound) 
                 
-                # Iterate directly over the keys (the enemies) to eliminate the nested loop
+                # Iterate over the enemies
                 for enemy in killed:
-                    # 10% drop chance (random.random() is faster than randint)
+                    # 10% drop chance 
                     if random.random() < 0.10: 
                         self.health_packs.add(HealthPack(enemy.rect.centerx, enemy.rect.centery))
 

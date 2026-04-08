@@ -1,10 +1,10 @@
-# Untitled Shooting Game 🎮
+# Untitled Shooting Game 
 
 A fast-paced, 2D platform shooter built in Python using Pygame. Created as a custom code project for COS10009, this game features chaotic arena combat inspired by titles like *Stick Fight: The Game*. Survive endless waves of enemies, manage your ammo, and climb the leaderboard!
 
-###[Watch the Video Demo Here](https://youtu.be/dkgGuUMACms?si=8cpEfgvUU3vzjw_E)
+[Watch the Video Demo Here](https://youtu.be/dkgGuUMACms?si=8cpEfgvUU3vzjw_E)
 
-##Features
+## Features
 
 * **Dynamic Arsenal:** Choose between three distinct weapons, each with unique fire rates, spread, and custom sound effects:
   * **Pistol:** Reliable single-shot standard sidearm.
@@ -16,7 +16,7 @@ A fast-paced, 2D platform shooter built in Python using Pygame. Created as a cus
 * **Progression Systems:** Features an interactive Gun Store between rounds and a persistent top-5 Leaderboard system to track your highest scores.
 * **Polished Atmosphere:** Fully integrated background music, custom environment art, and dynamic visual effects like bullet sparks.
 
-## 🛠️ Installation & Setup
+## Installation & Setup
 
 1. Make sure you have [Python](https://www.python.org/downloads/) installed on your computer.
 2. Install the Pygame library by opening your terminal or command prompt and running:

@@ -42,7 +42,7 @@ class Game:
         self.small_font = pygame.font.SysFont(None, 32)
         self.title_font = pygame.font.SysFont(None, 100) 
 
-        # Pre-rendering static text for speed
+        # Pre-rendering text
         self.title_surf = self.title_font.render("UNTITLED SHOOTING GAME", True, WHITE)
         self.title_rect = self.title_surf.get_rect(center=(SCREEN_WIDTH // 2, 100))
 
@@ -77,7 +77,7 @@ class Game:
         try:
             # Load the image and convert it for better performance
             raw_bg = pygame.image.load("assets/background.png").convert()
-            # Scale it to match the screen size exactly
+            # Scale it to match the screen 
             self.bg_image = pygame.transform.scale(raw_bg, (SCREEN_WIDTH, SCREEN_HEIGHT))
         except Exception as e:
             print("Warning: Could not load background.png. Make sure it is in your assets folder!")
@@ -88,7 +88,7 @@ class Game:
             self.player_hit_sound.set_volume(0.5)
             self.enemy_hit_sound.set_volume(0.4)
             
-            # Dynamically load the shoot and reload sounds for each gun
+            #load the shoot and reload sounds for each gun
             for w in ["pistol", "shotgun", "rifle"]:
                 shoot_sfx = pygame.mixer.Sound(f"assets/{w}_shoot.wav")
                 reload_sfx = pygame.mixer.Sound(f"assets/{w}_reload.wav")
@@ -144,7 +144,7 @@ class Game:
         self.health_packs = pygame.sprite.Group()
 
     def reset_game_state(self):
-        #"""Clears everything to start a fresh round."""
+        #Clears everything to start a fresh round
         self.spawn_timer = 0
         self.player.health = self.player.max_health
         self.score = 0
@@ -167,7 +167,7 @@ class Game:
             sound.play()
 
     def start_reload(self):
-        """Triggers the reload timer and sound."""
+        #Triggers the reload timer and sound
         self.is_reloading = True
         self.reloading_weapon = self.weapon 
         self.reload_timer = self.reload_duration
@@ -181,7 +181,7 @@ class Game:
                 self.running = False
     
             if event.type == pygame.KEYDOWN:
-                # Global Quit Key
+                # Quit Key
                 if event.key == pygame.K_q:
                     self.running = False
                 # Manual Reload
@@ -227,7 +227,7 @@ class Game:
                     self.fire_weapon()
 
     def fire_weapon(self):
-        """Handles the different firing logic for each gun."""
+        #Handles the different firing logic for each gun.
         if self.is_reloading: 
             return
             

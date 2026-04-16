@@ -1,5 +1,4 @@
 import pygame
-import random
 
 class Platform(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height, color=(115, 150, 140)):

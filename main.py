@@ -2,7 +2,7 @@ import pygame
 import sys
 import random
 from settings import *
-from player import Player, Enemy, FlyingEnemy
+from MovableObjects import Player, Enemy, FlyingEnemy
 from environment import Platform, HealthPack
 from weapons import Gun, Bullet, Spark
 from leaderboard import Leaderboard
@@ -16,23 +16,26 @@ class Game:
         pygame.display.set_caption("Untitled Shooting Game")
         self.clock = pygame.time.Clock()
         
-        #Game State
+        # Game State
         self.state = "main_menu" 
         self.running = True
         self.score = 0
         self.spawn_timer = 0
         self.weapon = "pistol"
         
-        # New Weapon Stats System
+        # Visual FX
+        self.parry_flash_timer = 0
+        
+        # Weapon Stats System
         self.weapons_data = {
             "pistol": {"ammo": 6, "max_ammo": 6, "cooldown": 0, "fire_rate": 15}, 
-            "shotgun": {"ammo": 2, "max_ammo": 2, "cooldown": 0, "fire_rate": 60}, # 1 second cooldown
+            "shotgun": {"ammo": 2, "max_ammo": 2, "cooldown": 0, "fire_rate": 60}, 
             "rifle": {"ammo": 30, "max_ammo": 30, "cooldown": 0, "fire_rate": 8}
         }
         self.is_reloading = False
         self.reloading_weapon = None
         self.reload_timer = 0
-        self.reload_duration = 120 # 2 seconds at 60 FPS
+        self.reload_duration = 120 
 
         # Load Leaderboard from our new file
         self.leaderboard_manager = Leaderboard()
@@ -46,41 +49,30 @@ class Game:
         self.title_surf = self.title_font.render("UNTITLED SHOOTING GAME", True, WHITE)
         self.title_rect = self.title_surf.get_rect(center=(SCREEN_WIDTH // 2, 100))
 
-        # --- SOUND SETUP ---
+        # Sound Setup
         pygame.mixer.init()
         self.player_hit_sound = None
         self.enemy_hit_sound = None
         
-        # Dictionary to hold distinct sounds for each weapon
         self.weapon_sounds = {
             "pistol": {"shoot": None, "reload": None},
             "shotgun": {"shoot": None, "reload": None},
             "rifle": {"shoot": None, "reload": None}
         }
 
-        # --- BACKGROUND MUSIC SETUP ---
         try:
-            # Load the streaming music file
             pygame.mixer.music.load("assets/theme.mp3") 
-            
-            # Set the volume a bit lower so it doesn't overpower your gun sound effects
             pygame.mixer.music.set_volume(0.2) 
-            
-            # The -1 argument tells Pygame to loop the music infinitely
             pygame.mixer.music.play(-1) 
-            
         except Exception as e:
-            print("Warning: Could not load background music. Check if 'theme.mp3' is in your assets folder!")
+            print("Warning: Could not load background music.")
 
-        # --- BACKGROUND IMAGE SETUP ---
         self.bg_image = None
         try:
-            # Load the image and convert it for better performance
             raw_bg = pygame.image.load("assets/background.png").convert()
-            # Scale it to match the screen 
             self.bg_image = pygame.transform.scale(raw_bg, (SCREEN_WIDTH, SCREEN_HEIGHT))
         except Exception as e:
-            print("Warning: Could not load background.png. Make sure it is in your assets folder!")
+            print("Warning: Could not load background.png.")
         
         try:
             self.player_hit_sound = pygame.mixer.Sound("assets/player_hit.wav")
@@ -88,7 +80,6 @@ class Game:
             self.player_hit_sound.set_volume(0.5)
             self.enemy_hit_sound.set_volume(0.4)
             
-            #load the shoot and reload sounds for each gun
             for w in ["pistol", "shotgun", "rifle"]:
                 shoot_sfx = pygame.mixer.Sound(f"assets/{w}_shoot.wav")
                 reload_sfx = pygame.mixer.Sound(f"assets/{w}_reload.wav")
@@ -99,7 +90,7 @@ class Game:
                 self.weapon_sounds[w]["reload"] = reload_sfx
                 
         except FileNotFoundError:
-            print("Warning: Asset files missing. Please ensure you have pistol_shoot.wav, pistol_reload.wav, etc. inside your 'asset' folder.")
+            print("Warning: Asset files missing for sounds.")
 
         # Player Setup
         self.player_image = pygame.Surface((50, 50))
@@ -127,13 +118,10 @@ class Game:
                 raw_gun_image = pygame.image.load(f"assets/{w}.png").convert_alpha()
                 self.weapon_images[w] = pygame.transform.scale(raw_gun_image, (90, 45))
             except Exception as e:
-                # Fallback to a grey box if an image is missing so the game doesn't crash
                 fallback = pygame.Surface((90, 45))
                 fallback.fill((100, 100, 100))
                 self.weapon_images[w] = fallback
-                print(f"Warning: Could not load {w}.png in assets folder.")
 
-        # Default to pistol on startup
         self.gun = Gun(self.player, self.weapon_images["pistol"])
         
         # Sprite Groups
@@ -144,7 +132,6 @@ class Game:
         self.health_packs = pygame.sprite.Group()
 
     def reset_game_state(self):
-        #Clears everything to start a fresh round
         self.spawn_timer = 0
         self.player.health = self.player.max_health
         self.score = 0
@@ -167,12 +154,9 @@ class Game:
             sound.play()
 
     def start_reload(self):
-        #Triggers the reload timer and sound
         self.is_reloading = True
         self.reloading_weapon = self.weapon 
         self.reload_timer = self.reload_duration
-        
-        # Play the specific reload sound for the current weapon
         self.play_sound(self.weapon_sounds[self.weapon]["reload"])
 
     def handle_events(self):
@@ -181,16 +165,14 @@ class Game:
                 self.running = False
     
             if event.type == pygame.KEYDOWN:
-                # Quit Key
                 if event.key == pygame.K_q:
                     self.running = False
-                # Manual Reload
+                    
                 if event.key == pygame.K_r and self.state == "playing":
                     stats = self.weapons_data[self.weapon]
                     if not self.is_reloading and stats["ammo"] < stats["max_ammo"]:
                         self.start_reload()
 
-                # State-specific Key Presses
                 if self.state == "main_menu":
                     if event.key == pygame.K_p:
                         self.state = "playing"
@@ -219,15 +201,12 @@ class Game:
                     if event.key == pygame.K_m:
                         self.reset_game_state()
                         self.state = "main_menu"
-                
-                
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if self.state == "playing" and event.button == 1:
                     self.fire_weapon()
 
     def fire_weapon(self):
-        #Handles the different firing logic for each gun.
         if self.is_reloading: 
             return
             
@@ -239,7 +218,6 @@ class Game:
             stats["ammo"] -= 1
             stats["cooldown"] = stats["fire_rate"]
             
-            # Play the specific shoot sound for the current weapon
             self.play_sound(self.weapon_sounds[self.weapon]["shoot"])
             
             if self.weapon == "pistol":
@@ -250,11 +228,9 @@ class Game:
                     new_bullet = Bullet(self.gun.rect.centerx, self.gun.rect.centery, self.gun.current_angle + spread)
                     self.bullets.add(new_bullet)
             elif self.weapon == "rifle":
-                # Now single clicks will actually spawn a rifle bullet!
                 new_bullet = Bullet(self.gun.rect.centerx, self.gun.rect.centery, self.gun.current_angle)
                 self.bullets.add(new_bullet)
                     
-            # Auto-reload if empty
             if stats["ammo"] <= 0:
                 self.start_reload()
 
@@ -262,11 +238,9 @@ class Game:
         if self.state == "playing":
             stats = self.weapons_data[self.weapon]
 
-            # Weapon cooldown logic
             if stats["cooldown"] > 0:
                 stats["cooldown"] -= 1
 
-            # Reloading logic
             if self.is_reloading:
                 self.reload_timer -= 1
                 if self.reload_timer <= 0:
@@ -274,7 +248,6 @@ class Game:
                     if self.reloading_weapon:
                         self.weapons_data[self.reloading_weapon]["ammo"] = self.weapons_data[self.reloading_weapon]["max_ammo"]
 
-            # Rifle Automatic Fire (fires while holding mouse)
             elif pygame.mouse.get_pressed()[0] and self.weapon == "rifle" and stats["cooldown"] <= 0:
                 if stats["ammo"] > 0:
                     stats["ammo"] -= 1
@@ -287,9 +260,9 @@ class Game:
                     if stats["ammo"] <= 0:
                         self.start_reload()
                 else:
-                    # If they try to fire while empty, force the reload
                     self.start_reload()
-            # Update all sprites
+                    
+            # Update sprites
             self.player.update(self.platforms) 
             self.gun.update()
             self.bullets.update()
@@ -301,36 +274,27 @@ class Game:
                 for _ in range(5): 
                     self.sparks.add(Spark(bullet.rect.centerx, bullet.rect.centery))
 
-            # Enemy Spawning (Randomly choose ground or flying)
+            # Enemy Spawning
             self.spawn_timer += 1
             if self.spawn_timer >= SPAWN_RATE: 
                 random_x = random.randint(100, 1100)
-                
-                # 50% chance to spawn a flying enemy
                 if random.choice([True, False]):
-                    # Spawn flying enemy higher up in the air
                     random_y = random.randint(50, 300)
                     self.enemies.add(FlyingEnemy(random_x, random_y))
                 else:
-                    # Spawn normal red enemy near the top to fall down
                     self.enemies.add(Enemy(random_x, 50))
-                    
                 self.spawn_timer = 0
                 
             self.enemies.update(self.platforms, self.player, self.enemy_bullets)
             pygame.sprite.groupcollide(self.enemy_bullets, self.platforms, True, False)
 
-            # Damage and Score logic with Sounds added
+            # Enemy Kills
             killed = pygame.sprite.groupcollide(self.enemies, self.bullets, True, True)
             if killed:
                 self.play_sound(self.enemy_hit_sound) 
-                
-                # Iterate over the enemies
                 for enemy in killed:
-                    # 10% drop chance 
-                    if random.random() < 0.10: 
+                    if random.random() < 0.70: 
                         self.health_packs.add(HealthPack(enemy.rect.centerx, enemy.rect.centery))
-
             self.score += len(killed) * 10
 
             self.health_packs.update(self.platforms)
@@ -339,13 +303,40 @@ class Game:
                 if self.player.health < self.player.max_health:
                     self.player.health += 1
 
-            if pygame.sprite.spritecollide(self.player, self.enemies, False) or \
-               pygame.sprite.spritecollide(self.player, self.enemy_bullets, True):
+            # PARRY LOGIC
+            if getattr(self.player, 'is_parrying', False): 
+                parried_bullets = pygame.sprite.spritecollide(
+                    self.player, 
+                    self.enemy_bullets, 
+                    True, 
+                    collided=lambda p, b: p.parry_rect.colliderect(b.rect)
+                )
+                
+                if parried_bullets:
+                    print("PARRY SUCCESSFUL!")
+                    self.parry_flash_timer = 5 
+                    pygame.time.delay(50) 
+                    
+                    for _ in parried_bullets:
+                        if self.player.health < self.player.max_health:
+                            self.player.health += 1
+                        
+                        self.weapons_data[self.weapon]["ammo"] = self.weapons_data[self.weapon]["max_ammo"]
+                        
+                        def_bullet = Bullet(self.player.rect.centerx, self.player.rect.centery, self.gun.current_angle)
+                        def_bullet.speed = 25 
+                        self.bullets.add(def_bullet)
+
+            # NORMAL DAMAGE
+            bullet_hits = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
+            enemy_hits = pygame.sprite.spritecollide(self.player, self.enemies, False)
+
+            if bullet_hits or enemy_hits:
                 if not self.player.invincible:
-                    self.play_sound(self.player_hit_sound) # Play player hit sound
+                    self.play_sound(self.player_hit_sound)
                 self.player.take_damage()
                 
-            # Game Over Trigger
+            # Game Over
             if self.player.health <= 0:
                 self.leaderboard_manager.add_score(self.score)
                 self.state = "game_over"
@@ -360,7 +351,6 @@ class Game:
             prompt_text = self.font.render("Press 'P' to Play  |  Press 'S' for Store  |  'Q' to Quit", True, (200, 200, 200))
             self.screen.blit(prompt_text, prompt_text.get_rect(center=(SCREEN_WIDTH // 2, 200))) 
 
-            # Leaderboard Display
             lb_title = self.font.render("LEADERBOARD", True, GOLD)
             self.screen.blit(lb_title, (SCREEN_WIDTH // 2 - 130, 300))
             for i, score in enumerate(self.leaderboard_manager.get_scores()):
@@ -371,7 +361,21 @@ class Game:
             if self.bg_image:
                 self.screen.blit(self.bg_image, (0, 0))
             for plat in self.platforms: plat.draw(self.screen)
+            
             self.player.draw(self.screen)
+            
+            # Draw the Parry Aura
+            if getattr(self.player, 'is_parrying', False):
+                pygame.draw.rect(self.screen, (0, 200, 255), self.player.parry_rect, 3, border_radius=10)
+
+            # Draw the Screen Flash
+            if getattr(self, 'parry_flash_timer', 0) > 0:
+                flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                flash_surf.fill((255, 255, 255))
+                flash_surf.set_alpha(self.parry_flash_timer * 50) 
+                self.screen.blit(flash_surf, (0, 0))
+                self.parry_flash_timer -= 1
+                
             self.gun.draw(self.screen)
             self.bullets.draw(self.screen)
             self.enemy_bullets.draw(self.screen)
@@ -379,7 +383,6 @@ class Game:
             self.health_packs.draw(self.screen)
             self.enemies.draw(self.screen) 
             
-            # Distinguished Score Section
             ui_bg = pygame.Surface((220, 110))
             ui_bg.fill(UI_BG_COLOR); ui_bg.set_alpha(200)
             self.screen.blit(ui_bg, (10, 10))
@@ -387,7 +390,6 @@ class Game:
             self.screen.blit(self.font.render(f"Score: {self.score}", True, GOLD), (20, 20)) 
             self.screen.blit(self.font.render(f"Health: {self.player.health}", True, RED), (20, 70))
 
-            # Ammo Display
             stats = self.weapons_data[self.weapon]
             if self.is_reloading and self.reloading_weapon == self.weapon:
                 ammo_text = self.small_font.render("RELOADING...", True, (0, 200, 255))

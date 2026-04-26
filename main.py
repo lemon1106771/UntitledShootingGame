@@ -76,6 +76,15 @@ class Game:
         self.small_font = pygame.font.SysFont(None, 32)
         self.title_font = pygame.font.SysFont(None, 100)
 
+        # HUD fonts — monospace for that ULTRAKILL terminal feel
+        mono = "Courier New"
+        self.hud_rank   = pygame.font.SysFont(mono, 46, bold=True)
+        self.hud_score  = pygame.font.SysFont(mono, 30, bold=True)
+        self.hud_combo  = pygame.font.SysFont(mono, 40, bold=True)
+        self.hud_medium = pygame.font.SysFont(mono, 28, bold=True)
+        self.hud_small  = pygame.font.SysFont(mono, 18, bold=True)
+        self.hud_tiny   = pygame.font.SysFont(mono, 13)
+
         # ---- leaderboard -------------------------------------------------
         self.leaderboard_manager = Leaderboard()
 
@@ -485,45 +494,169 @@ class Game:
 
         self._draw_hud()
 
+    # ------------------------------------------------------------------
+    # HUD helpers
+    # ------------------------------------------------------------------
+    def _hud_panel(self, x, y, w, h, alpha=210):
+        """Draw a semi-transparent dark panel with a 1px border."""
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        surf.fill((*HUD_BG, alpha))
+        self.screen.blit(surf, (x, y))
+        pygame.draw.rect(self.screen, HUD_BORDER, (x, y, w, h), 1)
+
+    def _hud_label(self, text, x, y, font=None):
+        """Tiny spaced-out category label."""
+        f = font or self.hud_tiny
+        surf = f.render(text.upper(), True, HUD_TEXT_DIM)
+        self.screen.blit(surf, (x, y))
+
+    def _hud_bar(self, x, y, w, h, pct, fill_color, bg_color=None):
+        """Horizontal bar. pct = 0.0–1.0."""
+        bg = bg_color or HUD_DIM
+        pygame.draw.rect(self.screen, bg,         (x, y, w, h))
+        pygame.draw.rect(self.screen, fill_color, (x, y, max(0, int(w * pct)), h))
+
+    def _get_style_rank(self):
+        rank = STYLE_RANKS[0]
+        for r in STYLE_RANKS:
+            if self.combo >= r[0]:
+                rank = r
+        return rank  # (min, letter, label, color)
+
+    # ------------------------------------------------------------------
+    # _draw_hud  — main entry point
+    # ------------------------------------------------------------------
     def _draw_hud(self):
-        # semi-transparent panel
-        panel = pygame.Surface((240, 145))
-        panel.fill(UI_BG_COLOR)
-        panel.set_alpha(200)
-        self.screen.blit(panel, (10, 10))
+        s = self.screen
 
-        self.screen.blit(self.font.render(f"Score: {self.score}", True, GOLD), (20, 20))
-        self.screen.blit(self.font.render(f"Health: {self.player.health}", True, RED),  (20, 68))
+        # ── STYLE RANK  (top-left) ─────────────────────────────────────
+        rank = self._get_style_rank()
+        self._hud_panel(16, 16, 90, 88)
+        self._hud_label("style", 26, 22)
+        rank_surf = self.hud_rank.render(rank[1], True, rank[3])
+        s.blit(rank_surf, (24, 34))
+        sub_surf = self.hud_tiny.render(rank[2], True, rank[3])
+        s.blit(sub_surf, (26, 88))
 
-        stats = self.weapons_data[self.weapon]
-        if self.is_reloading and self.reloading_weapon == self.weapon:
-            ammo_surf = self.small_font.render("RELOADING...", True, CYAN)
+        # ── SCORE  (top-center) ────────────────────────────────────────
+        score_str = str(self.score).zfill(5)
+        score_surf = self.hud_score.render(score_str, True, HUD_AMBER)
+        score_rect = score_surf.get_rect(centerx=SCREEN_WIDTH // 2, top=18)
+        self._hud_panel(score_rect.x - 12, 14,
+                        score_rect.width + 24, score_rect.height + 16)
+        self._hud_label("score",
+                         score_rect.centerx - 18, 18)
+        s.blit(score_surf, (score_rect.x, 30))
+
+        # ── PARRY COOLDOWN  (top-right) ────────────────────────────────
+        px = SCREEN_WIDTH - 114
+        self._hud_panel(px, 16, 98, 58)
+        self._hud_label("parry", px + 10, 22)
+        parry_pct = 1.0 - (self.player.parry_cooldown / 60)
+        parry_pct = max(0.0, min(1.0, parry_pct))
+        if self.player.is_parrying:
+            p_color = (0, 220, 255)
+            p_text  = "ACTIVE"
+        elif parry_pct >= 1.0:
+            p_color = HUD_GREEN
+            p_text  = "READY"
         else:
-            ammo_surf = self.font.render(
-                f"Ammo: {stats['ammo']}/{stats['max_ammo']}", True, CYAN)
-        self.screen.blit(ammo_surf, (20, 116))
+            p_color = HUD_GRAY
+            p_text  = "CD"
+        self._hud_bar(px + 10, 52, 78, 3, parry_pct, p_color)
+        p_surf = self.hud_small.render(p_text, True, p_color)
+        s.blit(p_surf, (px + 10, 36))
 
-        # combo
+        # ── COMBO  (center-screen, fades in at 2+) ─────────────────────
         if self.combo >= 2:
-            combo_color = GOLD if self.combo < 5 else ORANGE
-            combo_surf  = self.font.render(f"x{self.combo} COMBO!", True, combo_color)
-            self.screen.blit(combo_surf, combo_surf.get_rect(
-                center=(SCREEN_WIDTH // 2, 40)))
+            combo_alpha = min(255, self.combo * 40 + 120)
+            cx = SCREEN_WIDTH // 2
+            c_surf = self.hud_combo.render(f"x{self.combo}", True, HUD_RED)
+            c_rect = c_surf.get_rect(centerx=cx, top=90)
+            # decay bar
+            decay_pct = self.combo_timer / COMBO_DECAY_FRAMES
+            bar_w = 100
+            self._hud_bar(cx - bar_w // 2, c_rect.bottom + 4,
+                          bar_w, 3, decay_pct, HUD_RED)
+            s.blit(c_surf, c_rect)
 
-        # dash indicator
-        if self.player.dash_cooldown > 0:
-            pct  = 1.0 - self.player.dash_cooldown / DASH_COOLDOWN
-            bar_w = int(100 * pct)
-            pygame.draw.rect(self.screen, (60, 60, 80),   (20, 160, 100, 10))
-            pygame.draw.rect(self.screen, (80, 180, 255), (20, 160, bar_w, 10))
-            label = self.small_font.render("DASH", True, (150, 150, 200))
-            self.screen.blit(label, (125, 157))
+        # ── HEALTH  (bottom-left) ──────────────────────────────────────
+        hp_max   = self.player.max_health
+        hp_cur   = max(0, self.player.health)
+        hp_pct   = hp_cur / hp_max if hp_max else 0
+        bx, by   = 16, SCREEN_HEIGHT - 88
+        bar_w    = 200
+        self._hud_panel(bx, by, bar_w + 28, 72)
+        self._hud_label("health", bx + 10, by + 8)
 
-        # hints
-        self.screen.blit(
-            self.small_font.render("M: Menu  R: Reload  Shift: Dash  F: Parry",
-                                   True, (150, 150, 150)),
-            (SCREEN_WIDTH - 420, 20))
+        # segmented bar
+        seg_w  = (bar_w - (hp_max - 1) * 2) // hp_max
+        for i in range(hp_max):
+            sx = bx + 10 + i * (seg_w + 2)
+            filled = i < hp_cur
+            color  = HUD_RED if filled else HUD_DIM
+            pygame.draw.rect(s, color, (sx, by + 26, seg_w, 14))
+            if filled:   # bright trailing edge
+                pygame.draw.rect(s, HUD_WHITE, (sx + seg_w - 2, by + 26, 2, 14))
+
+        hp_num  = self.hud_medium.render(str(hp_cur), True, HUD_RED)
+        hp_denom= self.hud_tiny.render(f"/{hp_max}", True, HUD_TEXT_DIM)
+        s.blit(hp_num,   (bx + 10, by + 44))
+        s.blit(hp_denom, (bx + 10 + hp_num.get_width() + 2, by + 52))
+
+        # ── DASH PIP  (bottom-center) ──────────────────────────────────
+        dp_ready = self.player.dash_cooldown == 0
+        dp_color = HUD_BLUE if dp_ready else HUD_DIM
+        dpx      = SCREEN_WIDTH // 2 - 22
+        dpy      = SCREEN_HEIGHT - 52
+        self._hud_panel(dpx - 6, dpy - 6, 56, 38)
+        pygame.draw.rect(s, dp_color, (dpx, dpy, 44, 10))
+        if not dp_ready:
+            fill_w = int(44 * (1.0 - self.player.dash_cooldown / DASH_COOLDOWN))
+            pygame.draw.rect(s, HUD_BLUE, (dpx, dpy, fill_w, 10))
+        self._hud_label("dash", dpx + 4, dpy + 14)
+
+        # ── AMMO  (bottom-right) ───────────────────────────────────────
+        stats      = self.weapons_data[self.weapon]
+        ammo_cur   = stats["ammo"]
+        ammo_max   = stats["max_ammo"]
+        w_color, w_border = WEAPON_COLORS[self.weapon]
+        pip_w, pip_h, pip_gap = 10, 22, 3
+        # clamp pips to 2 rows of 15 max
+        display_max = min(ammo_max, 30)
+        cols        = min(display_max, 15)
+        rows        = (display_max + cols - 1) // cols
+        panel_w     = cols * (pip_w + pip_gap) + 20
+        panel_h     = rows * (pip_h + pip_gap) + 52
+        ax          = SCREEN_WIDTH - panel_w - 16
+        ay          = SCREEN_HEIGHT - panel_h - 16
+        self._hud_panel(ax, ay, panel_w, panel_h)
+        self._hud_label("ammo", ax + 10, ay + 8)
+
+        for i in range(display_max):
+            col = i % cols
+            row = i // cols
+            px2 = ax + 10 + col * (pip_w + pip_gap)
+            py2 = ay + 24 + row * (pip_h + pip_gap)
+            filled = i < ammo_cur
+            fc = w_color  if filled else HUD_DIM
+            bc = w_border if filled else HUD_GRAY
+            pygame.draw.rect(s, fc,  (px2, py2, pip_w, pip_h))
+            pygame.draw.rect(s, bc,  (px2, py2, pip_w, pip_h), 1)
+
+        # ammo number + weapon name
+        if self.is_reloading and self.reloading_weapon == self.weapon:
+            # blinking RELOAD text
+            if pygame.time.get_ticks() % 600 < 300:
+                rl = self.hud_small.render("RELOAD", True, w_color)
+                s.blit(rl, (ax + 10, ay + panel_h - 36))
+        else:
+            a_num  = self.hud_medium.render(str(ammo_cur), True, w_color)
+            a_den  = self.hud_tiny.render(f"/{ammo_max}", True, HUD_TEXT_DIM)
+            s.blit(a_num,  (ax + 10, ay + panel_h - 42))
+            s.blit(a_den,  (ax + 10 + a_num.get_width() + 2, ay + panel_h - 34))
+        wpn_surf = self.hud_tiny.render(self.weapon.upper(), True, HUD_TEXT_DIM)
+        s.blit(wpn_surf, (ax + 10, ay + panel_h - 16))
 
     def _draw_gun_store(self):
         self.screen.fill((50, 50, 60))
